@@ -231,7 +231,7 @@ function renderPool(p){
   document.getElementById('pool').innerHTML =
     '<table><tr><th title="真实消耗顺序：1 号先烧，与上面的展示序无关">消耗序</th><th>账号（'+p.accounts.length+'）</th><th>积分</th><th>积分过期时间</th><th>今日</th><th>状态</th><th>签到</th><th>旅行</th><th></th></tr>'
     +(rows||'<tr><td colspan=9 class="muted">池是空的——先点「同步 App 当前登录号」</td></tr>')+'</table>'
-    +(queried?'<div class="muted" style="margin-top:6px">合计积分 '+sum+' · 展示序＝积分快到期在前；真实消耗序仍按下面的优先级</div>':'<div class="muted" style="margin-top:6px">积分未查询——点上方「查积分/到期」</div>')
+    +(queried?'<div class="muted" style="margin-top:6px">合计积分 '+sum+' · 积分＝点「查积分/到期」那一刻的实时值（30 分钟缓存，要最新就再点一次）· 展示序＝积分快到期在前</div>':'<div class="muted" style="margin-top:6px">积分未查询——点上方「查积分/到期」</div>')
     +soonTip+warn;
   var modeEl=document.getElementById('accMode'); if(modeEl) modeEl.textContent=(p.accOrder&&p.accOrder.custom)?'· 自定义消耗序':'· 默认轮换（最久未用先用）';
   if(p.buddy&&p.buddy.updatedAt) document.getElementById('buddyAt').textContent='上次跑：'+new Date(p.buddy.updatedAt).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai',hour:'2-digit',minute:'2-digit'});
@@ -337,9 +337,11 @@ function renderQoderPool(qp){
       +'<td>'+(a.todayCalls||0)+'</td><td>'+ck+'</td><td style="text-align:right">'+sw+'</td></tr>';
   }).join('');
   var qsoon=(qp.accounts||[]).filter(function(a){return a.creditExpiresAt && a.creditExpiresAt-Date.now()<7*86400000 && (a.spendable||0)>0}).length;
+  var qLive=(qp.accounts||[]).some(function(a){return a.creditLive});
   poolEl.innerHTML='<table><tr><th>账号（'+qp.total+'）</th><th>套餐</th><th>积分</th><th>积分过期时间</th><th>今日</th><th>签到</th><th></th></tr>'+rows+'</table>'+
     '<div class="muted" style="margin-top:6px">合计积分 '+(qp.accounts||[]).reduce(function(x,a){return x+(a.spendable||0)},0)+
-    ' · 展示序＝积分快到期在前 · 操作与自动版同一 CLI 通道，号池数据两边实时共用</div>'+
+    (qLive?' · 积分＝点「查积分/到期」那一刻的实时值（30 分钟缓存，要最新就再点一次）':' · 积分＝签到/巡检时的快照，点「查积分/到期」取实时值')+
+    ' · 展示序＝积分快到期在前</div>'+
     (qsoon?'<div style="color:var(--warn);margin-top:6px">⚠️ 7 天内到期 '+qsoon+' 个号，已排在最前，优先烧它们的积分</div>':'');
 }
 function qact(a){toast('执行中…（走自动版 CLI）');jpost('/panel/action',{action:a}).then(function(r){toast(r.ok?('完成：'+(r.result||'')):('失败：'+(r.error||'')));load()})}
