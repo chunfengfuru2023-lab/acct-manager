@@ -1,0 +1,623 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>账号管家 · WorkBuddy + Qoder</title>
+<style>
+:root{--bg:#12141a;--card:#1c2029;--line:#2a2f3d;--tx:#dde2ee;--dim:#8b93a7;--ok:#3fb96f;--warn:#e6a23c;--bad:#e05d5d;--ac:#4c8dff}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--tx);font:14px/1.6 -apple-system,"PingFang SC",sans-serif;padding:24px}
+h1{font-size:19px;margin:0 0 4px}
+.sub{color:var(--dim);font-size:12.5px;margin-bottom:14px}
+.tabs{display:flex;gap:8px;margin-bottom:16px}
+.tab{padding:8px 22px;border-radius:10px;border:1px solid var(--line);background:var(--card);color:var(--dim);cursor:pointer;font-size:14px}
+.tab.on{background:var(--ac);border-color:var(--ac);color:#fff;font-weight:600}
+.page{display:none}.page.on{display:block}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(320px,1fr));gap:14px;max-width:1280px}
+.card{background:var(--card);border:1px solid var(--line);border-radius:12px;padding:16px}
+.card h2{font-size:14px;margin:0 0 12px;display:flex;justify-content:space-between;align-items:center;gap:8px}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{color:var(--dim);text-align:left;font-weight:400;padding:4px 8px 4px 0;border-bottom:1px solid var(--line)}
+td{padding:6px 8px 6px 0;border-bottom:1px solid var(--line)}
+.mono{font-family:ui-monospace,monospace;font-size:12px}
+.dot{display:inline-block;width:8px;height:8px;border-radius:50%;margin-right:6px}
+.d-ok{background:var(--ok)}.d-bad{background:var(--bad)}.d-dim{background:var(--dim)}
+.badge{display:inline-block;padding:1px 8px;border-radius:99px;font-size:11.5px;border:1px solid var(--line);color:var(--dim);margin:2px 4px 2px 0;cursor:pointer}
+.badge:hover{color:var(--tx);border-color:var(--ac)}
+button{background:#232837;border:1px solid var(--line);color:var(--tx);border-radius:8px;padding:6px 12px;font-size:13px;cursor:pointer}
+button:hover{border-color:var(--ac)}
+button.ac{background:var(--ac);border-color:var(--ac);color:#fff}
+button.swbtn{padding:2px 8px;font-size:11.5px}
+pre{background:#10131a;border:1px solid var(--line);border-radius:8px;padding:12px;font-size:12px;overflow:auto;margin:8px 0;white-space:pre-wrap}
+.muted{color:var(--dim);font-size:12px}
+.row{display:flex;gap:8px;flex-wrap:wrap;align-items:center;margin-top:10px}
+.big{font-size:26px;font-weight:700}
+.flexline{display:flex;justify-content:space-between;align-items:center}
+input.inp{flex:1;min-width:180px;background:#10131a;border:1px solid var(--line);color:var(--tx);border-radius:8px;padding:6px 10px;font-size:12.5px}
+#toast{position:fixed;bottom:24px;left:50%;transform:translateX(-50%);background:#2a3040;border:1px solid var(--ac);padding:8px 18px;border-radius:8px;display:none;z-index:9;font-size:13px}
+</style>
+</head>
+<body>
+<h1>账号管家 <span style="color:var(--dim);font-weight:400;font-size:14px">WorkBuddy + Qoder · 一个网关</span></h1>
+<div class="sub">网关 http://127.0.0.1:19400 · <span id="listenMode">只监听本机</span> · <span id="hbeat">检测中…</span> · 30 秒自动刷新</div>
+
+<div class="tabs">
+  <div class="tab on" id="tab-wb" onclick="showTab('wb')">WorkBuddy</div>
+  <div class="tab" id="tab-qd" onclick="showTab('qd')">Qoder</div>
+</div>
+
+<!-- ═══════════ WorkBuddy 页 ═══════════ -->
+<div class="page on" id="page-wb">
+  <div class="grid">
+    <div class="card">
+      <div class="flexline"><h2>WorkBuddy 接入配置</h2><button class="ac" onclick="copyCfg('wb')">一键复制</button></div>
+      <pre id="cfg-wb">加载中…</pre>
+      <div class="muted">模型名填 <b>workbuddymodel</b>（统一链自动排序），或点名 workbuddymodel/cn:&lt;id&gt;。口令：
+        <div class="row"><button onclick="reveal('wb')">显示口令</button><span id="sec-wb" class="mono" style="word-break:break-all"></span></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>余额速览</h2>
+      <div id="bal" class="muted">积分查询每次都会向官方计费接口发请求，默认不自动刷。<div class="row"><button class="ac" onclick="loadBal()">现在查一次</button></div></div>
+    </div>
+    <div class="card" style="grid-column:1/-1">
+      <div class="flexline"><h2>用量 · WorkBuddy <span id="wb-usage-at" class="muted"></span> <span id="wb-refresh-at" class="muted"></span></h2>
+        <span class="row" style="margin:0"><button id="wb-tab-today" class="ac" onclick="showUsage('wb','today')">当日</button><button id="wb-tab-hist" onclick="showUsage('wb','hist')">历史</button></span>
+      </div>
+      <div id="wb-usage" class="muted">加载中…</div>
+    </div>
+
+    <div class="card" style="grid-column:1/-1">
+      <h2>模型 · 统一链 <span id="wbMode" class="muted"></span></h2>
+      <div id="models">…</div>
+      <div class="muted">池内账号自动轮换（一次一号 + 分档冷却）；点模型名 = 复制调用名。</div>
+      <div class="flexline" style="margin-top:10px">
+        <h2 style="margin:0">账号池 · 积分与切号 <span id="accMode" class="muted"></span></h2>
+        <span class="row" style="margin:0">
+          <span id="wb-credit-at" class="muted"></span>
+          <button onclick="loadWbCredits(true)">查积分/到期</button>
+        </span>
+      </div>
+      <div id="pool"></div>
+      <div class="row">
+        <button class="ac" onclick="accSave()">保存消耗序</button>
+        <button onclick="accReset()">恢复默认轮换</button>
+        <span class="muted">消耗序：1 号先用，烧完/冷却自动降下一号；↑↓ 调整后要点保存</span>
+      </div>
+      <div class="row">
+        <button onclick="act('sync')">同步 App 当前登录号</button>
+        <button onclick="wbCapture()">存当前号快照</button>
+        <button class="ac" onclick="act('buddy-now')">立即签到 + 派猫旅行</button>
+        <span class="muted" id="buddyAt"></span>
+      </div>
+      <div class="muted" style="margin-top:6px">「切」= 把 WorkBuddy 桌面端登录态换成该号（写前备份 + 读回校验，失败自动回滚）。WB App 重启后界面才刷新；网关调用不受影响，一直用池内令牌。</div>
+      <h2 style="margin-top:16px">链排序</h2>
+      <div id="wbchain" class="muted">…</div>
+      <div class="row">
+        <button class="ac" onclick="wbSave()">保存排序</button>
+        <button onclick="wbReset()">恢复默认</button>
+        <span class="muted">撞闸 3 次/日的模型自动跳过；点名 cn:&lt;id&gt; 不受链影响</span>
+      </div>
+    </div>
+
+    <div class="card" style="grid-column:1/-1">
+      <h2>局域网设备钥匙 <span id="lanState" class="muted"></span></h2>
+      <div class="muted" id="lanHint">给家里其他电脑/设备发一把受限钥匙：只能调模型、每日限次数、可单独吊销。钥匙卡里的链接填到那台设备的 agent 配置里即可。</div>
+      <div id="lankeys" class="muted">…</div>
+      <div class="row">
+        <input id="lanName" class="inp" placeholder="设备名（如：台式机）" style="max-width:180px">
+        <input id="lanLimit" class="inp" placeholder="每日上限" value="500" style="max-width:90px">
+        <button class="ac" onclick="lanAdd()">新建钥匙</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══════════ Qoder 页 ═══════════ -->
+<div class="page" id="page-qd">
+  <div class="grid">
+    <div class="card">
+      <div class="flexline"><h2>Qoder 接入配置</h2><button class="ac" onclick="copyCfg('qd')">一键复制</button></div>
+      <pre id="cfg-qd">加载中…</pre>
+      <div class="muted">模型名填 <b>Qodermanager</b>（链路由自动选档）。两种接法都行：直连 QM(18300)，或走管家(19400) 的 qodermodel。口令：
+        <div class="row"><button onclick="reveal('qd')">显示口令</button><span id="sec-qd" class="mono" style="word-break:break-all"></span></div>
+      </div>
+    </div>
+    <div class="card">
+      <h2>链与签到</h2>
+      <div class="muted">模型链：<span id="qchain" class="mono">…</span><br>自动签到：<span id="qauto">…</span><br>
+      账号池与 Qoder 自动版实时共用（同一份 store.json），操作走官方 CLI。</div>
+    </div>
+    <div class="card" style="grid-column:1/-1">
+      <div class="flexline"><h2>用量 · Qoder <span id="qd-usage-at" class="muted"></span> <span id="qd-refresh-at" class="muted"></span></h2>
+        <span class="row" style="margin:0"><button id="qd-tab-today" class="ac" onclick="showUsage('qd','today')">当日</button><button id="qd-tab-hist" onclick="showUsage('qd','hist')">历史</button></span>
+      </div>
+      <div id="qd-usage" class="muted">加载中…</div>
+    </div>
+    <div class="card" style="grid-column:1/-1">
+      <h2>模型 · 链序（点名字 = 复制调用名）</h2>
+      <div id="qmodels">…</div>
+      <div class="flexline" style="margin-top:10px">
+        <h2 style="margin:0">账号池 · 积分与切号</h2>
+        <span class="row" style="margin:0">
+          <span id="qd-exp-at" class="muted"></span>
+          <button onclick="loadCreditExpiry(true)">查积分/到期</button>
+        </span>
+      </div>
+      <div id="qpool"></div>
+      <div class="row">
+        <button class="ac" onclick="qact('qoder-checkin')">全号签到</button>
+        <button onclick="qact('qoder-sync')">同步当前号</button>
+        <button onclick="qact('qoder-import')">找回历史号</button>
+        <button onclick="qact('qoder-failover')">接力检查</button>
+      </div>
+      <div class="row" style="margin-top:8px">
+        <input id="qtoken" class="inp" placeholder="粘贴 drt- 或 PAT 令牌加号">
+        <button onclick="qadd()">添加账号</button>
+      </div>
+      <h2 style="margin-top:16px">Qodermanager 模型排序 <span id="qmMode" class="muted"></span></h2>
+      <div id="qmchain" class="muted">…</div>
+      <div class="row">
+        <button class="ac" onclick="qmSave()">保存排序</button>
+        <button onclick="qmReset()">恢复默认</button>
+        <span class="muted">请求从上往下试：先撞闸/熔断再降下一档，最迟 1 分钟生效</span>
+      </div>
+    </div>
+  </div>
+</div>
+
+<div id="toast"></div>
+<script>
+var SECRET = null;      // 管家 19400 bearer
+var QMSECRET = null;    // QM 18300 token
+var PANEL_TOKEN = "__PANEL_TOKEN__"; // 网关心给浏览器的 HTML 注入；#token= 可覆盖（.app 壳用）；跨站伪造不了（自定义头触发 CORS 预检）
+(function(){var m=location.hash.match(/token=([A-Za-z0-9_-]+)/);if(m)PANEL_TOKEN=m[1]})()
+function esc(s){return String(s==null?'':s).replace(/[<>&"]/g,function(c){return {'<':'&lt;','>':'&gt;','&':'&amp;','"':'&quot;'}[c]})}
+function toast(m){var t=document.getElementById('toast');t.textContent=m;t.style.display='block';setTimeout(function(){t.style.display='none'},1900)}
+function jget(u){return fetch(u,{headers:{'X-Panel-Token':PANEL_TOKEN}}).then(function(r){return r.json()})}
+function jpost(u,body){return fetch(u,{method:'POST',headers:{'Content-Type':'application/json','X-Panel-Token':PANEL_TOKEN},body:body?JSON.stringify(body):''}).then(function(r){return r.json()})}
+
+// 标签页
+function showTab(k){
+  document.getElementById('page-wb').className='page'+(k==='wb'?' on':'');
+  document.getElementById('page-qd').className='page'+(k==='qd'?' on':'');
+  document.getElementById('tab-wb').className='tab'+(k==='wb'?' on':'');
+  document.getElementById('tab-qd').className='tab'+(k==='qd'?' on':'');
+  try{localStorage.setItem('acct-tab',k)}catch(e){}
+}
+
+var ACCDRAFT = null, accDirty = false;
+// 积分过期单元格：与 Qoder 页同口径（7 天内到期高亮、已过期标红、未知灰）
+function creditExpiryCell(a){
+  if(a.creditError) return '<span class="muted" title="'+esc(a.creditError)+'">查询失败</span>';
+  var e=a.creditExpiresAt;
+  if(!e) return '<span class="muted">'+esc(a.creditExpiresLabel||'未查询')+'</span>';
+  var days=(e-Date.now())/86400000;
+  var tip=a.creditExpiresPackage?('积分包：'+a.creditExpiresPackage):'';
+  if(days<0) return '<span style="color:var(--bad)" title="'+esc(tip)+'">已过期</span>';
+  if(days<7) return '<span style="color:var(--warn)" title="'+esc(tip)+'">'+(Math.round(days*10)/10)+' 天后 · '+esc(a.creditExpiresLabel)+'</span>';
+  return '<span title="'+esc(tip)+'">'+esc(a.creditExpiresLabel)+'</span>';
+}
+function renderPool(p){
+  var buddy=(p.buddy&&p.buddy.accounts)||{};
+  // 🔴 展示序 ≠ 消耗序：服务端把账号按「积分快到期」排序展示，
+  //   但消耗序草稿必须按真实消耗序（_rank → LRU）建立，否则一点保存就把展示序误写成消耗序。
+  if(!accDirty) ACCDRAFT = p.accounts.slice().sort(function(a,b){return (a._rank-b._rank)||((a._last||0)-(b._last||0))}).map(function(a){return a.uid});
+  var rankOf={}; ACCDRAFT.forEach(function(u,i){rankOf[u]=i});
+  var rows = p.accounts.map(function(a){
+    var rk=rankOf[a.uid]; if(rk==null) rk=0;
+    var cooled = a.cooldownUntilMs > Date.now();
+    var st = cooled ? '<span class="dot d-bad"></span>停手期' : '<span class="dot d-ok"></span>可用';
+    var credit = a.credit==null ? '<span class="muted">未查询</span>'
+      : '<span style="color:'+(a.credit<=0?'var(--bad)':(a.credit<50?'var(--warn)':'var(--tx)'))+'">'+a.credit+'</span>';
+    var cur=a.current?' <span class="badge" style="cursor:default;border-color:var(--ok);color:var(--ok)">当前</span>':'';
+    var b = findBuddy(buddy,a.uid);
+    var ci = b&&b.checkin ? (b.checkin.ok?(b.checkin.already?'<span style="color:var(--dim)">已签</span>':'<span style="color:var(--ok)">签到✓</span>'):'<span style="color:var(--bad)">签失败</span>') : '<span class="muted">—</span>';
+    var tv = b&&b.travel ? travelIcon(b.travel.action) : '<span class="muted">—</span>';
+    var sw = a.current ? '' : '<button class="swbtn" onclick="wbSwitch(\''+esc(a.fullUid||a.uid)+'\')">切</button>';
+    var mv = '<button style="padding:1px 6px" onclick="accMove(\''+esc(a.uid)+'\',-1)"'+(rk===0?' disabled':'')+'>↑</button> <button style="padding:1px 6px" onclick="accMove(\''+esc(a.uid)+'\',1)"'+(rk===ACCDRAFT.length-1?' disabled':'')+'>↓</button>';
+    return '<tr><td class="muted" style="width:18px">'+(rk+1)+'</td>'
+      +'<td>'+esc(a.name||a.uid)+cur+'<div class="muted mono" style="font-size:11px">'+esc(a.uid)+'</div></td>'
+      +'<td>'+credit+'</td><td>'+creditExpiryCell(a)+'</td><td>'+(a.todayCalls||0)+'</td>'
+      +'<td>'+st+'</td><td>'+ci+'</td><td>'+tv+'</td>'
+      +'<td style="text-align:right;white-space:nowrap">'+sw+' '+mv+'</td></tr>';
+  }).join('');
+  var warn = p.accounts.some(function(a){return a.cooldownUntilMs>Date.now()&&a.cooldownKind==='restricted'})
+    ? '<div class="muted" style="margin-top:8px;color:var(--warn)">⚠️ 有号被官方标记限制。去对应 App 里发条消息核实；核实前管家不会碰这个号。</div>' : '';
+  var soon = p.accounts.filter(function(a){return a.creditExpiresAt && a.creditExpiresAt-Date.now()<7*86400000 && (a.credit||0)>0}).length;
+  var soonTip = soon ? '<div style="color:var(--warn);margin-top:6px">⚠️ 7 天内到期 '+soon+' 个号，已排在最前，优先烧它们的积分</div>' : '';
+  var sum = p.accounts.reduce(function(s,a){return s+(a.credit||0)},0);
+  var queried = p.accounts.some(function(a){return a.credit!=null});
+  document.getElementById('pool').innerHTML =
+    '<table><tr><th title="真实消耗顺序：1 号先烧，与上面的展示序无关">消耗序</th><th>账号（'+p.accounts.length+'）</th><th>积分</th><th>积分过期时间</th><th>今日</th><th>状态</th><th>签到</th><th>旅行</th><th></th></tr>'
+    +(rows||'<tr><td colspan=9 class="muted">池是空的——先点「同步 App 当前登录号」</td></tr>')+'</table>'
+    +(queried?'<div class="muted" style="margin-top:6px">合计积分 '+sum+' · 展示序＝积分快到期在前；真实消耗序仍按下面的优先级</div>':'<div class="muted" style="margin-top:6px">积分未查询——点上方「查积分/到期」</div>')
+    +soonTip+warn;
+  var modeEl=document.getElementById('accMode'); if(modeEl) modeEl.textContent=(p.accOrder&&p.accOrder.custom)?'· 自定义消耗序':'· 默认轮换（最久未用先用）';
+  if(p.buddy&&p.buddy.updatedAt) document.getElementById('buddyAt').textContent='上次跑：'+new Date(p.buddy.updatedAt).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai',hour:'2-digit',minute:'2-digit'});
+}
+// ── WB 桌面登录态快捷切号（参考 workbuddy-switch）──────────────────────────
+function wbSwitch(uid){
+  var a=(window.__ACC||[]).filter(function(x){return (x.fullUid||x.uid)===uid})[0];
+  var name=a?(a.name||a.uid):String(uid).slice(0,8);
+  if(!confirm('把 WorkBuddy 桌面端切到「'+name+'」？\n\n写前自动备份登录态，写完读回校验，不符自动回滚。\nWB App 重启后界面才刷新；网关调用不受影响。'))return;
+  toast('切换中…');
+  jpost('/panel/action',{action:'wb-switch',target:uid}).then(function(r){
+    toast(r.ok?('✅ '+(r.result||'已切换')):('失败：'+(r.error||'')));
+    if(r.ok) refreshPool();
+  }).catch(function(){toast('切换失败：网关没响应')});
+}
+function wbCapture(){
+  toast('存快照中…');
+  jpost('/panel/action',{action:'wb-capture'}).then(function(r){toast(r.ok?('✅ '+(r.result||'已存')):('失败：'+(r.error||'')))});
+}
+// 只刷账号表（不调 load()，避免 load ↔ loadWbCredits 互相递归）
+function refreshPool(){
+  return jget('/panel/state').then(function(p){
+    window.__ACC=p.accounts;window.__BUDDY=p.buddy;window.__ACCORDER=p.accOrder;
+    renderPool(p);
+  }).catch(function(){});
+}
+// WB 积分/到期：启动时自动查一次（吃 30 分钟缓存），按钮强制重查。
+// 计费接口有成本：autoQueried 保证自动只查一次，之后全靠手动按钮。
+var wbCreditAutoQueried=false;
+function loadWbCredits(force){
+  if(!force){ if(wbCreditAutoQueried) return; wbCreditAutoQueried=true; }
+  var el=document.getElementById('wb-credit-at');
+  if(el) el.textContent=force?'· 查询中…（逐号打计费接口）':'· 查询中…';
+  jget('/panel/wb-credit-expiry'+(force?'?force=1':'')).then(function(r){
+    if(el) el.textContent = r.error ? ('· 查询失败：'+esc(r.error)) : (r.at?('· 查于 '+new Date(r.at).toLocaleTimeString('zh-CN')+' · 合计 '+r.total+' 积分'+(r.soonCount?(' · ⚠️7天内到期 '+r.soonCount+' 个'):'')):'');
+    refreshPool();  // 让账号表带上积分与到期列（不走 load，防递归）
+  }).catch(function(){ if(el) el.textContent='· 查询失败（网关没响应）'; });
+}
+function accMove(uid,d){
+  var i=ACCDRAFT.indexOf(uid); if(i<0) return;
+  var j=i+d; if(j<0||j>=ACCDRAFT.length) return;
+  var t=ACCDRAFT[i]; ACCDRAFT[i]=ACCDRAFT[j]; ACCDRAFT[j]=t; accDirty=true;
+  renderPool({accounts:(window.__ACC||[]),buddy:window.__BUDDY,accOrder:window.__ACCORDER});
+}
+function accSave(){if(!ACCDRAFT){toast('还没加载');return}jpost('/panel/action',{action:'wb-account-order-set',order:ACCDRAFT}).then(function(r){toast(r.ok?('✅ '+(r.result||'已保存')):('失败：'+(r.error||'')));if(r.ok){accDirty=false;load()}})}
+function accReset(){if(!confirm('恢复默认轮换（最久未用的号先用）？'))return;jpost('/panel/action',{action:'wb-account-order-set',order:[]}).then(function(r){toast(r.ok?('✅ '+(r.result||'已恢复')):('失败：'+(r.error||'')));if(r.ok){accDirty=false;load()}})}
+function findBuddy(buddy,uid){ for(var k in buddy){ if(buddy[k].uid===uid) return buddy[k]; } return null; }
+function travelIcon(a){
+  return {departed:'<span style="color:var(--ok)">已派出</span>',claimed:'<span style="color:var(--ok)">领奖</span>',limit:'<span style="color:var(--dim)">今日已达上限</span>',waiting:'<span style="color:var(--warn)">旅行中</span>','no-buddy':'<span class="muted">未领养</span>',error:'<span style="color:var(--bad)">出错</span>'}[a]||esc(a);
+}
+
+function renderModels(p){
+  // WB 徽章按链序展示
+  var ms = p.models||{}; var wb=(p.wb&&p.wb.chain)||[]; var list=ms.cn||[];
+  var byId={}; list.forEach(function(m){byId[m.id]=m});
+  var ordered = wb.length ? wb.map(function(c){return byId[c.id]||{id:c.id}}) : list;
+  document.getElementById('models').innerHTML = ordered.length
+    ? ordered.map(function(m){
+        return '<span class="badge" title="点击复制调用名" onclick="cpName(\'workbuddymodel/cn:'+esc(m.id)+'\')">'+esc(m.id)+(m.credits?' · '+esc(m.credits):'')+'</span>';
+      }).join('')
+    : '<div class="muted">没取到目录（号未登录或在停手期）</div>';
+  var q = p.qoder||[];
+  document.getElementById('qmodels').innerHTML = q.length
+    ? '<div class="muted" style="margin-bottom:6px">点名某个模型：复制 <span class="mono">qodermodel/&lt;id&gt;</span>（管家直连号池）；要自动选档就填 <span class="mono">qodermodel</span> 或 <span class="mono">Qodermanager</span>。</div>'
+      + q.map(function(id){return '<span class="badge" title="点击复制钉名调用" onclick="cpName(\'qodermodel/'+esc(id)+'\')">'+esc(id)+'</span>'}).join('')
+    : '<div class="muted">读不到 QM 链（Qodermanager 网关没响应？）</div>';
+  renderQoderPool(p.qoderPool);
+}
+
+// Qoder 积分/到期：与 WB 页同构——结果直接进号池表，不再单独占一张卡。
+// 自动只查一次（qdCreditAutoQueried 守卫），之后靠按钮；服务端另有 30 分钟缓存。
+var qdCreditAutoQueried=false;
+function loadCreditExpiry(force){
+  if(!force){ if(qdCreditAutoQueried) return; qdCreditAutoQueried=true; }
+  var at=document.getElementById('qd-exp-at');
+  if(at) at.textContent='· 查询中…（逐号查上游）';
+  jget('/panel/credit-expiry'+(force?'?force=1':'')).then(function(r){
+    if(at){
+      if(r.error) at.textContent='· 查询失败：'+esc(r.error);
+      else if(r.at){
+        var sum=(r.rows||[]).reduce(function(s,x){return s+(x.spendable||0)},0);
+        at.textContent='· 查于 '+new Date(r.at).toLocaleTimeString('zh-CN')+' · 合计 '+sum+' 积分'+(r.soonCount?(' · ⚠️7天内到期 '+r.soonCount+' 个'):'');
+      }
+    }
+    refreshPool();  // 号池表带上积分过期列，不用等 30 秒轮询
+  }).catch(function(){ if(at) at.textContent='· 查询失败（网关没响应）'; });
+}
+function renderQoderPool(qp){
+  var chainEl=document.getElementById('qchain'), poolEl=document.getElementById('qpool'), autoEl=document.getElementById('qauto');
+  if(!qp||qp.error){ chainEl.textContent='—'; poolEl.innerHTML='<div class="muted">Qoder 池读不到：'+esc(qp&&qp.error||'未知')+'</div>'; return; }
+  chainEl.textContent=(qp.chain||[]).join(' → ')||'—';
+  if(autoEl) autoEl.innerHTML = qp.autoCheckin&&qp.autoCheckin.enabled
+    ? '<span style="color:var(--ok)">开 · 每日 '+esc(qp.autoCheckin.time)+'</span>'
+    : '<span style="color:var(--dim)">关</span>';
+  var rows=(qp.accounts||[]).map(function(a){
+    var s=a.spendable||0;
+    var ck=a.checkedToday?'<span style="color:var(--ok)">✓</span>':(a.checkinDay?'<span style="color:var(--dim)">'+esc(a.checkinDay.slice(5))+'</span>':'<span class="muted">—</span>');
+    var cur=a.current?' <span class="badge" style="cursor:default;border-color:var(--ok);color:var(--ok)">当前</span>':'';
+    var sw=a.current?'':'<button class="swbtn" onclick="qswitch(\''+esc(a.uid)+'\')">切</button>';
+    return '<tr><td>'+esc(a.name)+cur+'</td><td class="muted">'+esc(a.plan||'—')+'</td>'
+      +'<td><span style="color:'+(s<=0?'var(--bad)':(s<50?'var(--warn)':'var(--tx)'))+'">'+s+'</span></td>'
+      +'<td>'+creditExpiryCell({creditExpiresAt:a.creditExpiresAt,creditExpiresLabel:a.creditExpiresLabel})+'</td>'
+      +'<td>'+(a.todayCalls||0)+'</td><td>'+ck+'</td><td style="text-align:right">'+sw+'</td></tr>';
+  }).join('');
+  var qsoon=(qp.accounts||[]).filter(function(a){return a.creditExpiresAt && a.creditExpiresAt-Date.now()<7*86400000 && (a.spendable||0)>0}).length;
+  poolEl.innerHTML='<table><tr><th>账号（'+qp.total+'）</th><th>套餐</th><th>积分</th><th>积分过期时间</th><th>今日</th><th>签到</th><th></th></tr>'+rows+'</table>'+
+    '<div class="muted" style="margin-top:6px">合计积分 '+(qp.accounts||[]).reduce(function(x,a){return x+(a.spendable||0)},0)+
+    ' · 展示序＝积分快到期在前 · 操作与自动版同一 CLI 通道，号池数据两边实时共用</div>'+
+    (qsoon?'<div style="color:var(--warn);margin-top:6px">⚠️ 7 天内到期 '+qsoon+' 个号，已排在最前，优先烧它们的积分</div>':'');
+}
+function qact(a){toast('执行中…（走自动版 CLI）');jpost('/panel/action',{action:a}).then(function(r){toast(r.ok?('完成：'+(r.result||'')):('失败：'+(r.error||'')));load()})}
+function qswitch(uid){if(!confirm('无感切换到该账号？（只写凭证，不重启 Qoder）'))return;jpost('/panel/action',{action:'qoder-switch',target:uid}).then(function(r){toast(r.ok?('完成：'+(r.result||'')):('失败：'+(r.error||'')));load()})}
+function qadd(){
+  var t=document.getElementById('qtoken').value.trim();
+  if(!t){toast('先粘贴令牌');return}
+  toast('验证并添加中…');
+  jpost('/panel/action',{action:'qoder-add',token:t}).then(function(r){
+    toast(r.ok?('✅ '+(r.result||'已添加')):('失败：'+(r.error||'')));
+    if(r.ok){document.getElementById('qtoken').value='';load()}
+  });
+}
+
+// ── Qodermanager 链序编辑器 ────────────────────────────────────────────────
+var QMDRAFT = null, qmDirty = false;
+function renderQMChain(qm){
+  var el=document.getElementById('qmchain'), modeEl=document.getElementById('qmMode');
+  if(!el) return;
+  if(!qm||!qm.chain||!qm.chain.length){ el.innerHTML='<span class="muted">读不到矩阵（model-matrix.json）</span>'; return; }
+  if(!qmDirty) QMDRAFT = qm.chain.map(function(m){return m.id});
+  modeEl.textContent = qm.custom ? '· 自定义序生效中' : '· 默认序';
+  el.innerHTML='<table>'+QMDRAFT.map(function(id,i){
+    var info=null; for(var k=0;k<qm.chain.length;k++){ if(qm.chain[k].id===id) info=qm.chain[k]; }
+    var tag=info&&info.free?'<span style="color:var(--ok)">免费</span>':(info&&info.price!=null?'<span class="muted">x'+info.price+'</span>':'');
+    var un=info&&info.matrix===false?' <span class="muted" title="上游目录已有，但矩阵还没扫到 → 引擎暂时跑不了它；等凌晨 deep 扫描后进链">· 未登记</span>':'';
+    return '<tr><td class="muted" style="width:22px">'+(i+1)+'.</td><td>'+esc(id)+' '+tag+un+'</td>'+
+      '<td style="text-align:right;white-space:nowrap"><button style="padding:1px 7px" onclick="qmMove('+i+',-1)"'+(i===0?' disabled':'')+'>↑</button> '+
+      '<button style="padding:1px 7px" onclick="qmMove('+i+',1)"'+(i===QMDRAFT.length-1?' disabled':'')+'>↓</button></td></tr>';
+  }).join('')+'</table>';
+}
+function qmMove(i,d){
+  var j=i+d; if(j<0||j>=QMDRAFT.length) return;
+  var t=QMDRAFT[i]; QMDRAFT[i]=QMDRAFT[j]; QMDRAFT[j]=t;
+  qmDirty=true;
+  if(window.__QM) renderQMChain(window.__QM);
+}
+function qmSave(){
+  if(!QMDRAFT){toast('还没加载到链');return}
+  jpost('/panel/action',{action:'qm-chain-set',order:QMDRAFT}).then(function(r){
+    toast(r.ok?('✅ '+(r.result||'已保存')):('失败：'+(r.error||'')));
+    if(r.ok){qmDirty=false;load()}
+  });
+}
+function qmReset(){
+  if(!confirm('恢复默认排序（免费按 id、付费按价格）？'))return;
+  jpost('/panel/action',{action:'qm-chain-set',order:[]}).then(function(r){
+    toast(r.ok?('✅ '+(r.result||'已恢复')):('失败：'+(r.error||'')));
+    if(r.ok){qmDirty=false;load()}
+  });
+}
+
+// ── WorkBuddy 统一链编辑器 ────────────────────────────────────────────────
+var WBDRAFT = null, wbDirty = false;
+function renderWBChain(wb){
+  var el=document.getElementById('wbchain'), modeEl=document.getElementById('wbMode');
+  if(!el) return;
+  if(!wb||!wb.chain||!wb.chain.length){ el.innerHTML='<span class="muted">读不到 WB 目录（号未登录或取目录失败）</span>'; return; }
+  if(!wbDirty) WBDRAFT = wb.chain.map(function(m){return m.id});
+  modeEl.textContent = wb.custom ? '· 自定义序生效中' : '· 默认序（免费在前、按倍率）';
+  var gated=(wb.gate&&wb.gate.counts)||{};
+  el.innerHTML='<table>'+WBDRAFT.map(function(id,i){
+    var info=null; for(var k=0;k<wb.chain.length;k++){ if(wb.chain[k].id===id) info=wb.chain[k]; }
+    var tag=info&&info.free?'<span style="color:var(--ok)">免费</span>':(info&&info.credits?'<span class="muted">'+esc(info.credits)+'</span>':'');
+    var g=gated[id]>=((wb.gateN||3))?' <span style="color:var(--bad)">今日已闸</span>':'';
+    return '<tr><td class="muted" style="width:22px">'+(i+1)+'.</td><td>'+esc(id)+' '+tag+g+'</td>'+
+      '<td style="text-align:right;white-space:nowrap"><button style="padding:1px 7px" onclick="wbMove('+i+',-1)"'+(i===0?' disabled':'')+'>↑</button> '+
+      '<button style="padding:1px 7px" onclick="wbMove('+i+',1)"'+(i===WBDRAFT.length-1?' disabled':'')+'>↓</button></td></tr>';
+  }).join('')+'</table>';
+}
+function wbMove(i,d){
+  var j=i+d; if(j<0||j>=WBDRAFT.length) return;
+  var t=WBDRAFT[i]; WBDRAFT[i]=WBDRAFT[j]; WBDRAFT[j]=t;
+  wbDirty=true;
+  if(window.__WB) renderWBChain(window.__WB);
+}
+function wbSave(){
+  if(!WBDRAFT){toast('还没加载到链');return}
+  jpost('/panel/action',{action:'wb-chain-set',order:WBDRAFT}).then(function(r){
+    toast(r.ok?('✅ '+(r.result||'已保存')):('失败：'+(r.error||'')));
+    if(r.ok){wbDirty=false;load()}
+  });
+}
+function wbReset(){
+  if(!confirm('恢复默认排序（免费在前、按倍率升序）？'))return;
+  jpost('/panel/action',{action:'wb-chain-set',order:[]}).then(function(r){
+    toast(r.ok?('✅ '+(r.result||'已恢复')):('失败：'+(r.error||'')));
+    if(r.ok){wbDirty=false;load()}
+  });
+}
+
+function cpName(n){navigator.clipboard.writeText(n).then(function(){toast('已复制调用名：'+n)})}
+function copyCfg(which){
+  var txt = which==='wb'
+    ? 'OPENAI_BASE_URL = http://127.0.0.1:19400/v1\nOPENAI_API_KEY   = '+(SECRET||'（先点"显示口令"）')+'\nmodel            = workbuddymodel'
+    : 'OPENAI_BASE_URL = '+(QMSECRET?QMSECRET.base:'http://127.0.0.1:18300')+'/v1\nOPENAI_API_KEY   = '+(QMSECRET&&QMSECRET.token?QMSECRET.token:'（先点"显示口令"）')+'\nmodel            = Qodermanager';
+  navigator.clipboard.writeText(txt).then(function(){toast('已复制'+(which==='wb'?' WorkBuddy':' Qoder')+' 配置')});
+}
+function reveal(which){
+  if(which==='wb'){
+    jpost('/panel/secret').then(function(r){SECRET=r.secret;document.getElementById('sec-wb').textContent=SECRET;toast('管家口令已取出')});
+  } else {
+    jpost('/panel/qm-secret').then(function(r){QMSECRET=r;document.getElementById('sec-qd').textContent=r.token;toast('QM 口令已取出（'+r.base+'）')});
+  }
+}
+function act(a){
+  toast('执行中…');
+  jpost('/panel/action',{action:a}).then(function(r){toast(r.ok?('完成：'+(r.result||'')):('失败：'+(r.error||'')));load()});
+}
+function loadBal(){
+  var el=document.getElementById('bal');el.innerHTML='逐号查询中…（计费查询，串行约几秒）';
+  jget('/panel/balances').then(function(b){
+    var accs=b.accounts||[];
+    if(!accs.length){el.innerHTML='<span class="muted">没有可查的号（池空或全在停手期）</span>';return}
+    el.innerHTML='<table><tr><th>账号</th><th>积分</th><th>包数</th></tr>'+accs.map(function(a){
+      var soon=a.expiringSoon&&a.expiringSoon.length;
+      var warn=soon?'<br><span style="color:var(--warn);font-size:11px">临期：'+esc(a.expiringSoon.join('；'))+'</span>':'';
+      return '<tr><td class="mono">'+esc(a.uid)+'</td><td>'+(a.total!=null?'<b>'+a.total+'</b>':('<span style="color:var(--bad)">'+esc((a.error||'失败').slice(0,40))+'</span>'))+warn+'</td><td class="muted">'+(a.packages!=null?a.packages:'—')+'</td></tr>';
+    }).join('')+'</table><div class="muted" style="margin-top:6px">合计 '+accs.reduce(function(x,a){return x+(a.total||0)},0)+' 分 · 查询为手动触发，不自动刷</div>';
+  }).catch(function(e){el.innerHTML='查询失败：'+esc(e)});
+}
+
+// ── 用量卡（当日/历史；WB + Qoder 同构数据一套渲染）────────────────────────
+var USAGE = null;                 // /panel/usage 缓存
+var USAGE_FREE = {wb:{},qd:{}};   // 各端免费档 id 集合（网关心下发）
+var usageMode = { wb:'today', qd:'today' };
+function fmtTok(n){ n=n||0; return n>=1e6?(n/1e6).toFixed(1)+'M':n>=1e3?(n/1e3).toFixed(1)+'k':String(n) }
+function fmtCr(n){ return (n||0).toFixed(2) }
+function shanghaiToday(){ return new Date(Date.now()+8*3600000).toISOString().slice(0,10) }
+function loadUsage(){
+  jget('/panel/usage?days=8').then(function(d){ USAGE=d; renderUsage('wb'); renderUsage('qd'); }).catch(function(){
+    document.getElementById('wb-usage').innerHTML='<span class="muted">用量读取失败</span>';
+    document.getElementById('qd-usage').innerHTML='<span class="muted">用量读取失败</span>';
+  });
+}
+
+// ── 局域网设备钥匙管理 ─────────────────────────────────────────────────────
+function renderLan(lan){
+  var st=document.getElementById('lanState'); if(!st) return;
+  var lm=document.getElementById('listenMode');
+  if(lan&&lm) lm.innerHTML = lan.on
+    ? '<span style="color:var(--warn)">局域网开放中</span>（http://'+esc(lan.ip)+':'+lan.port+'）'
+    : '只监听本机';
+  if(!lan){ st.textContent=''; return; }
+  st.innerHTML = lan.on
+    ? '<span style="color:var(--ok)">已开启</span> · 局域网地址 http://'+esc(lan.ip)+':'+lan.port+'/v1（明文 HTTP，仅限自家设备）'
+    : '<span style="color:var(--dim)">未开启</span> · 钥匙已可预建；网关目前只监听本机';
+  var keys=lan.keys||[];
+  document.getElementById('lankeys').innerHTML = keys.length
+    ? '<table><tr><th>设备</th><th>今日/上限</th><th>token/积分</th><th>钥匙</th><th></th></tr>'+keys.map(function(k){
+        var pct=k.dailyLimit?Math.min(100,Math.round(k.today.calls/k.dailyLimit*100)):0;
+        var bar='<div style="background:#10131a;border-radius:4px;height:6px;width:90px;display:inline-block;vertical-align:middle;margin-right:6px"><div style="width:'+pct+'%;height:6px;border-radius:4px;background:'+(pct>=90?'var(--bad)':'var(--ac)')+'"></div></div>';
+        var tok=esc(k.token.slice(0,10))+'…';
+        return '<tr><td>'+esc(k.name)+(k.revoked?' <span style="color:var(--bad)">已吊销</span>':'')+'</td>'+
+          '<td>'+bar+k.today.calls+' / '+k.dailyLimit+'</td>'+
+          '<td class="muted">'+fmtTok(k.today.input+ (k.today.output||0))+' tok · '+(k.today.credit||0).toFixed(2)+' 分</td>'+
+          '<td class="mono" title="点击复制完整钥匙" style="cursor:pointer" onclick="cpName(\''+esc(k.token)+'\')">'+tok+'</td>'+
+          '<td style="white-space:nowrap;text-align:right">'+
+            (k.revoked
+              ? '<button style="padding:2px 8px;font-size:11.5px" onclick="lanDel(\''+k.id+'\')">删除</button>'
+              : '<button style="padding:2px 8px;font-size:11.5px" onclick="lanRevoke(\''+k.id+'\')">吊销</button>')+
+          '</td></tr>';
+      }).join('')+'</table>'
+    : '<span class="muted">还没有钥匙——下面输入设备名点"新建"。</span>';
+}
+function lanAdd(){
+  var name=document.getElementById('lanName').value.trim(), limit=document.getElementById('lanLimit').value.trim()||500;
+  if(!name){toast('先填设备名');return}
+  jpost('/panel/action',{action:'lan-key-add',name:name,dailyLimit:Number(limit)}).then(function(r){
+    if(r.ok){ toast('✅ '+r.result+'（钥匙已复制到剪贴板）'); navigator.clipboard.writeText(r.key.token).catch(function(){}); document.getElementById('lanName').value=''; load(); }
+    else toast('失败：'+(r.error||''));
+  });
+}
+function lanRevoke(id){ if(!confirm('吊销该钥匙？对应设备立即不能调用'))return; jpost('/panel/action',{action:'lan-key-revoke',id:id}).then(function(r){toast(r.ok?('✅ '+r.result):('失败：'+(r.error||'')));load()}) }
+function lanDel(id){ if(!confirm('删除该钥匙记录？'))return; jpost('/panel/action',{action:'lan-key-delete',id:id}).then(function(r){toast(r.ok?('✅ '+r.result):('失败：'+(r.error||'')));load()}) }
+function showUsage(k,mode){
+  usageMode[k]=mode;
+  document.getElementById(k+'-tab-today').className=mode==='today'?'ac':'';
+  document.getElementById(k+'-tab-hist').className=mode==='hist'?'ac':'';
+  renderUsage(k);
+}
+function renderUsage(k){
+  var el=document.getElementById(k+'-usage'); if(!el||!USAGE) return;
+  var src = k==='wb' ? USAGE.wb : USAGE.qoder;
+  var atEl=document.getElementById(k+'-usage-at'); if(atEl) atEl.textContent='· '+new Date(USAGE.at).toLocaleTimeString('zh-CN',{timeZone:'Asia/Shanghai',hour:'2-digit',minute:'2-digit',second:'2-digit'})+' 更新';
+  if(!src||src.error){ el.innerHTML='<span class="muted">'+esc(src&&src.error||'无数据')+'</span>'; return; }
+  // 免费档清单由网关随用量一起下发（freeModels）；没有就当空集，只影响标签不缺数据
+  USAGE_FREE[k] = src.freeModels || {};
+  var days=src.days||[];
+  if(!days.length){ el.innerHTML='<span class="muted">最近 '+USAGE.days+' 天没有调用记录</span>'; return; }
+  if(usageMode[k]==='today'){
+    var t=(days.find(function(d){return d.day===shanghaiToday()})||{}).total;
+    if(!t){ el.innerHTML='<span class="muted">今日暂无调用</span>'; return; }
+    var dt=days.find(function(d){return d.day===shanghaiToday()});
+    var qd = k==='qd' ? ' · 标价 '+fmtCr(dt.total.quotedCredit)+' 分（实扣 0 的档位不真扣）' : '';
+    el.innerHTML='<div style="display:flex;gap:26px;flex-wrap:wrap;align-items:baseline">'+
+      '<div><div class="big">'+t.calls+'</div><div class="muted">次调用</div></div>'+
+      '<div><div class="big">'+fmtTok(t.input)+'</div><div class="muted">输入 token</div></div>'+
+      '<div><div class="big">'+fmtTok(t.output)+'</div><div class="muted">输出 token</div></div>'+
+      '<div><div class="big" style="color:var(--warn)">'+fmtCr(t.credit)+'</div><div class="muted">积分消耗'+qd+'</div></div></div>'+
+      modelTable(days.find(function(d){return d.day===shanghaiToday()}).byUid, k);
+    return;
+  }
+  // 历史：按天汇总表 + 每天展开按模型积分行
+  el.innerHTML='<table><tr><th>日期</th><th>次数</th><th>输入</th><th>输出</th><th>积分</th><th>主要账号</th></tr>'+
+    days.map(function(d){
+      var top=(d.byUid||[])[0];
+      var who=top?((top.name||String(top.uid).slice(0,8))+'（'+top.calls+' 次 · '+fmtCr(top.credit)+' 分）'):'—';
+      return '<tr><td class="mono">'+esc(d.day)+'</td><td>'+d.total.calls+'</td><td>'+fmtTok(d.total.input)+'</td><td>'+fmtTok(d.total.output)+'</td><td>'+fmtCr(d.total.credit)+(d.total.quotedCredit?'<span class="muted"> /标'+fmtCr(d.total.quotedCredit)+'</span>':'')+'</td><td class="muted">'+esc(who)+'</td></tr>'+
+        '<tr><td></td><td colspan=5 style="padding-top:0">'+modelTable(d.byUid, k)+'</td></tr>';
+    }).join('')+'</table>';
+}
+
+/** 按模型汇总积分：把各账号的 byModel 合并（模型 × 积分是跨号的，不能只看 top 账号）。
+ *  免费档（isFreeModels 里有它）实扣 0 是正常，标「免费·不扣」；
+ *  非免费模型却实扣 0 才算异常，标「⚠ 没记实扣」。 */
+function modelTable(byUid){
+  var showQ = arguments.length>1 && arguments[1]==='qd';
+  var freeSet = USAGE_FREE[showQ?'qd':'wb'] || {};
+  var agg={}, order=[];
+  (byUid||[]).forEach(function(a){
+    (a.byModel||[]).forEach(function(m){
+      var e=agg[m.model];
+      if(!e){ e=agg[m.model]={calls:0,input:0,output:0,credit:0,quoted:0,accts:[]}; order.push(m.model); }
+      e.calls+=m.calls; e.input+=m.input; e.output+=m.output; e.credit+=m.credit; e.quoted+=m.quotedCredit||0;
+      e.accts.push((a.name||String(a.uid).slice(0,8))+' '+fmtCr(m.credit)+(m.quotedCredit?'/标'+fmtCr(m.quotedCredit):''));
+    });
+  });
+  if(!order.length) return '';
+  order.sort(function(x,y){return agg[y].credit-agg[x].credit || agg[y].calls-agg[x].calls});
+  var maxCr=Math.max.apply(null,order.map(function(i){return agg[i].credit}))||1;
+  return '<div style="margin:10px 0 2px" class="muted">按模型 · 积分消耗</div>'+
+    '<table style="font-size:12.5px"><tr><th>模型</th><th>次数</th><th>输入</th><th>输出</th><th>实扣</th>'+(showQ?'<th>标价</th>':'')+'<th style="width:90px"></th></tr>'+
+    order.map(function(id){
+      var e=agg[id], w=Math.max(2,Math.round(e.credit/maxCr*90));
+      var tag = freeSet[id]
+        ? ' <span style="color:var(--ok)">免费 · 不扣</span>'
+        : (e.credit<=0&&e.quoted>0 ? ' <span style="color:var(--bad)" title="非免费模型却实扣 0，账本可能没记 billable">⚠ 没记实扣</span>' : '');
+      return '<tr><td class="mono">'+esc(id)+tag+'</td><td>'+e.calls+'</td><td>'+fmtTok(e.input)+'</td><td>'+fmtTok(e.output)+'</td>'+
+        '<td style="color:'+(e.credit>0?'var(--warn)':'var(--dim)')+'">'+fmtCr(e.credit)+'</td>'+
+        (showQ?'<td class="muted">'+(e.quoted?fmtCr(e.quoted):'—')+'</td>':'')+
+        '<td><span style="display:block;height:6px;border-radius:3px;background:var(--warn);opacity:.65;width:'+w+'px" title="'+esc(e.accts.join(' · '))+'"></span></td></tr>';
+    }).join('')+'</table>';
+}
+
+// 定时刷新（00:00 / 12:00）落下的快照：给两个页脚各标一句"上次自动刷新"
+function renderRefreshAt(r){
+  var el1=document.getElementById('wb-refresh-at'), el2=document.getElementById('qd-refresh-at');
+  if(!r||!r.at){ var t='· 自动刷新未跑过'; if(el1)el1.textContent=t; if(el2)el2.textContent=t; return }
+  var hm=new Date(r.at).toLocaleString('zh-CN',{timeZone:'Asia/Shanghai',month:'2-digit',day:'2-digit',hour:'2-digit',minute:'2-digit'});
+  var bad=(r.errors||[]).length;
+  var t='· 自动刷新 '+hm+(bad?'（'+bad+' 项失败）':'');
+  if(el1)el1.textContent=t; if(el2)el2.textContent=t;
+}
+
+function load(){
+  fetch('/health').then(function(r){if(!r.ok)throw 0;return r.json()}).then(function(){
+    document.getElementById('hbeat').innerHTML='<span class="dot d-ok"></span>运行中（launchd 守护，崩了自动拉起）';
+  }).catch(function(){
+    document.getElementById('hbeat').innerHTML='<span class="dot d-bad"></span>网关没响应';
+  });
+  jget('/panel/state').then(function(p){
+    window.__ACC=p.accounts;window.__BUDDY=p.buddy;window.__ACCORDER=p.accOrder;
+    renderPool(p);renderModels(p);
+    window.__QM=p.qm;renderQMChain(p.qm);
+    window.__WB=p.wb;renderWBChain(p.wb);
+    renderLan(p.lan);
+    renderRefreshAt(p.refresh);
+  }).catch(function(){});
+  loadUsage();
+  loadCreditExpiry(false);
+  loadWbCredits(false);   // 自动只查一次（内部 autoQueried 守卫），之后靠按钮
+  document.getElementById('cfg-wb').textContent='OPENAI_BASE_URL = http://127.0.0.1:19400/v1\nOPENAI_API_KEY   = （点"显示口令"）\nmodel            = workbuddymodel';
+  document.getElementById('cfg-qd').textContent='OPENAI_BASE_URL = http://127.0.0.1:18300/v1\nOPENAI_API_KEY   = （点"显示口令"）\nmodel            = Qodermanager';
+}
+try{if(localStorage.getItem('acct-tab')==='qd')showTab('qd')}catch(e){}
+load();
+setInterval(load,30000);
+</script>
+</body>
+</html>

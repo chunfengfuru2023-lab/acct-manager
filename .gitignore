@@ -1,0 +1,49 @@
+# ── 运行期数据：绝不入库（令牌 / 身份快照 / 钥匙 / 账本）──
+# data/ 里有 wb-accounts.enc.json（加密账号池）、wb-profiles/（明文令牌快照）、
+# wb-auth-backups/（桌面登录态整份备份）、lan-keys.json（设备钥匙明文）、
+# events.jsonl / wb-usage.jsonl（调用账本）。全部本机私有，一律不进仓库。
+data/
+logs/
+backups/
+
+# ── 二进制与构建产物 ──
+# bin/ 是从 Qoder 账号管家 .app 抽出来的 CLI 二进制 + qoder-router 资源（约 10MB），
+# 属于本机运行依赖，不入库；克隆后按 README 从上游 App 自行抽取。
+bin/
+client/acct-client
+*.app/
+build/
+dist/
+node_modules/
+
+# ── 凭据 / 登录态 / 密钥（兜一层，防误放）──
+*.enc.json
+*.info
+*.dat
+store.json
+log.json
+auto.json
+failover*.json
+model-matrix.json
+wb-names.json
+wb-profiles/
+wb-auth-backups/
+lan-keys.json
+*.pem
+*.key
+.env
+.env.*
+
+# ── 本地临时备份副本 ──
+*.bak
+*.bak-*
+*.tmp
+*.tmp-*
+
+# ── macOS / 编辑器 ──
+.DS_Store
+._*
+*.swp
+*~
+.vscode/
+.idea/
